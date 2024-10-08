@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Moments</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -23,7 +24,7 @@
         </form>
         <ul class="moments-list">
             {% for moment in moments %}
-                <li class="moment-item">
+                <li class="moment-item" id="moment-{{ moment.id }}">
                     <div class="moment-header">
                         <img src="{{ url_for('static', filename=moment.user.avatar) }}" alt="Avatar" class="avatar">
                         <span class="username">{{ moment.user.username }}</span>
@@ -38,7 +39,7 @@
                             </li>
                         {% endfor %}
                     </ul>
-                    <form action="/moment/{{ moment.id }}" method="post" class="comment-form">
+                    <form action="/moment/{{ moment.id }}/comment" method="post" class="comment-form">
                         <textarea name="comment" placeholder="Write a comment..." class="comment-textarea" required></textarea>
                         <button type="submit" class="btn btn-info">Comment</button>
                     </form>
@@ -46,5 +47,33 @@
             {% endfor %}
         </ul>
     </div>
+    <script>
+        $(document).ready(function() {
+            $('.comment-form').submit(function(event) {
+                event.preventDefault();
+                var form = $(this);
+                var momentId = form.attr('action').split('/')[2];
+                var commentText = form.find('textarea[name="comment"]').val();
+
+                $.ajax({
+                    type: 'POST',
+                    url: form.attr('action'),
+                    data: { comment: commentText },
+                    success: function(response) {
+                        if (response.success) {
+                            var commentHtml = '<li class="comment-item">' +
+                                                '<p class="comment-text">' + response.comment + '</p>' +
+                                                '<small>' + response.timestamp + '</small>' +
+                                              '</li>';
+                            $('#moment-' + momentId + ' .comments-list').append(commentHtml);
+                            form.find('textarea[name="comment"]').val('');
+                        } else {
+                            alert('Something went wrong. Please try again.');
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>

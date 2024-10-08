@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -36,8 +36,7 @@ def register():
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
             return redirect(url_for('register'))
-        # hashed_password = generate_password_hash(password, method='sha256')
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')  # 更改
         new_user = User(username=username, password=hashed_password)
         db.session.add(new_user)
         db.session.commit()
@@ -71,7 +70,7 @@ def post_moment():
         db.session.add(new_moment)
         db.session.commit()
 
-        # Call API to get comment content
+        # 调用API获取评论内容
         response = requests.post(API_URL, json={"message": content})
         if response.status_code == 200:
             comments = response.json().get('comment', [])
@@ -82,21 +81,20 @@ def post_moment():
 
     return redirect(url_for('index'))
 
-@app.route('/moment/<int:moment_id>', methods=['GET', 'POST'])
+@app.route('/moment/<int:moment_id>/comment', methods=['POST'])
 @login_required
-def view_moment(moment_id):
+def comment_moment(moment_id):
     moment = Moment.query.get_or_404(moment_id)
-    if request.method == 'POST':
-        comment_text = request.form.get('comment')
-        if comment_text:
-            new_comment = Comment(moment_id=moment.id, text=comment_text)
-            db.session.add(new_comment)
-            db.session.commit()
-        return redirect(url_for('view_moment', moment_id=moment_id))
-    return render_template('moment.html', moment=moment)
+    comment_text = request.form.get('comment')
+    if comment_text:
+        new_comment = Comment(moment_id=moment.id, text=comment_text)
+        db.session.add(new_comment)
+        db.session.commit()
+        return jsonify(success=True, comment=new_comment.text, timestamp=new_comment.timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+    return jsonify(success=False)
 
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
-    # app.run(host="0.0.0.0", port=5000, debug=True)
+    # app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
