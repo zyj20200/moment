@@ -8,16 +8,25 @@
 <body>
     <div class="container">
         <h1>Moments</h1>
+        {% if current_user.is_authenticated %}
+            <p>Welcome, {{ current_user.username }}!</p>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary">Logout</a>
+        {% else %}
+            <div class="auth-links">
+                <a href="{{ url_for('login') }}" class="btn btn-primary">Login</a>
+                <a href="{{ url_for('register') }}" class="btn btn-primary">Register</a>
+            </div>
+        {% endif %}
         <form action="/post" method="post" class="post-form">
-            <textarea name="content" placeholder="What's on your mind?" required></textarea>
-            <button type="submit">Post</button>
+            <textarea name="content" placeholder="What's on your mind?" class="post-textarea" required></textarea>
+            <button type="submit" class="btn btn-success">Post</button>
         </form>
         <ul class="moments-list">
             {% for moment in moments %}
                 <li class="moment-item">
                     <div class="moment-header">
-                        <img src="{{ url_for('static', filename=moment.avatar) }}" alt="Avatar" class="avatar">
-                        <span class="username">{{ moment.username }}</span>
+                        <img src="{{ url_for('static', filename=moment.user.avatar) }}" alt="Avatar" class="avatar">
+                        <span class="username">{{ moment.user.username }}</span>
                     </div>
                     <p class="moment-content">{{ moment.content }}</p>
                     <small>{{ moment.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
@@ -30,8 +39,8 @@
                         {% endfor %}
                     </ul>
                     <form action="/moment/{{ moment.id }}" method="post" class="comment-form">
-                        <textarea name="comment" placeholder="Write a comment..." required></textarea>
-                        <button type="submit">Comment</button>
+                        <textarea name="comment" placeholder="Write a comment..." class="comment-textarea" required></textarea>
+                        <button type="submit" class="btn btn-info">Comment</button>
                     </form>
                 </li>
             {% endfor %}
