@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ moment.content }}</title>
+</head>
+<body>
+    <h1>{{ moment.content }}</h1>
+    <form action="" method="post">
+        <textarea name="comment" placeholder="Write a comment..." required></textarea>
+        <button type="submit">Comment</button>
+    </form>
+    <ul>
+        {% for comment in moment.comments %}
+            <li>
+                <p>{{ comment.text }}</p>
+                <small>{{ comment.timestamp }}</small>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('index') }}">Back to Moments</a>
+</body>
+</html>

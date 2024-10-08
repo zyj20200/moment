@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Moments</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Moments</h1>
+        <form action="/post" method="post" class="post-form">
+            <textarea name="content" placeholder="What's on your mind?" required></textarea>
+            <button type="submit">Post</button>
+        </form>
+        <ul class="moments-list">
+            {% for moment in moments %}
+                <li class="moment-item">
+                    <div class="moment-header">
+                        <img src="{{ url_for('static', filename=moment.avatar) }}" alt="Avatar" class="avatar">
+                        <span class="username">{{ moment.username }}</span>
+                    </div>
+                    <p class="moment-content">{{ moment.content }}</p>
+                    <small>{{ moment.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                    <ul class="comments-list">
+                        {% for comment in moment.comments %}
+                            <li class="comment-item">
+                                <p class="comment-text">{{ comment.text }}</p>
+                                <small>{{ comment.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <form action="/moment/{{ moment.id }}" method="post" class="comment-form">
+                        <textarea name="comment" placeholder="Write a comment..." required></textarea>
+                        <button type="submit">Comment</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
