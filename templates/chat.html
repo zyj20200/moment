@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat with Robot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        .chat-container {
+            display: flex;
+            width: 80%;
+            height: 80%;
+            max-height: 800px;
+            max-width: 1200px;
+            margin: 50px auto;
+            background-color: #f0f2f5;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .robot-list {
+            width: 250px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .robot-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .robot-item:hover {
+            background-color: #f0f0f0;
+        }
+        .chat-window {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            padding: 10px;
+        }
+        .chat-header {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .chat-message {
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        .chat-message img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .chat-message .content {
+            padding: 10px;
+            border-radius: 10px;
+            background-color: #f1f1f1;
+        }
+        .chat-message.you .content {
+            background-color: #dcf8c6;
+            order: -1;
+        }
+        .chat-input {
+            display: flex;
+            border-top: 1px solid #eee;
+            padding: 10px;
+        }
+        .chat-input textarea {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 10px;
+            resize: none;
+        }
+        .chat-input button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="robot-list">
+            <div class="robot-item" data-robot="robot_1">Robot 1</div>
+            <div class="robot-item" data-robot="robot_2">Robot 2</div>
+            <div class="robot-item" data-robot="robot_3">Robot 3</div>
+        </div>
+        <div class="chat-window">
+            <div class="chat-header">
+                <h2 id="chat-title">Chat with Robot 1</h2>
+            </div>
+            <div class="chat-box" id="chat-box"></div>
+            <div class="chat-input">
+                <textarea name="message" placeholder="Type your message here..." required></textarea>
+                <button id="send-button">Send</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function parseCustomDate(dateStr) {
+            const [datePart, timePart] = dateStr.split(' ');
+            const [year, month, day] = datePart.split('-').map(Number);
+            const [hour, minute, second] = timePart.split(':').map(Number);
+            return new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+        }
+
+        $(document).ready(function() {
+            let currentRobot = "robot_1";
+
+            $('.robot-item').click(function() {
+                currentRobot = $(this).data('robot');
+                $('#chat-title').text('Chat with ' + currentRobot);
+                $('#chat-box').html(''); // Clear chat box
+            });
+
+            $('#send-button').click(function() {
+                const message = $('textarea[name="message"]').val();
+                if (!message.trim()) return;
+
+                const chatBox = $('#chat-box');
+                const currentTime = new Date().toLocaleTimeString();
+
+                // Display user's message
+                chatBox.append(`<div class="chat-message you">
+                                    <img src="{{ url_for('static', filename='user_avatar.jpg') }}" alt="Avatar">
+                                    <div class="content">${message} <span class="time">${currentTime}</span></div>
+                                </div>`);
+                $('textarea[name="message"]').val('');
+                chatBox.scrollTop(chatBox[0].scrollHeight);
+
+                let robotMessageBox = $(`
+                    <div class="chat-message">
+                        <img src="{{ url_for('static', filename='robot_avatar.jpg') }}" alt="Avatar">
+                        <div class="content"><span class="content-text"></span> <span class="time">${currentTime}</span></div>
+                    </div>
+                `);
+                chatBox.append(robotMessageBox);
+                chatBox.scrollTop(chatBox[0].scrollHeight);
+
+                let currentMessage = "";
+
+                const eventSource = new EventSource('/chat_stream');
+                eventSource.onmessage = function(event) {
+                    console.log("Received data:", event.data);  // Debug: log received data
+                    const data = JSON.parse(event.data);
+
+                    // Update the current message with new content
+                    currentMessage += data.content;
+                    robotMessageBox.find('.content-text').text(currentMessage);
+                    chatBox.scrollTop(chatBox[0].scrollHeight);
+                };
+                eventSource.onerror = function() {
+                    robotMessageBox.find('.content').append('<div class="error">Error: Unable to connect to the chat server.</div>');
+                    chatBox.scrollTop(chatBox[0].scrollHeight);
+                    currentMessage = ""; // Reset current message
+                    eventSource.close();
+                };
+
+                $.ajax({
+                    type: 'POST',
+                    url: '/send_message',
+                    data: { message: message },
+                    success: function(response) {
+                        if (!response.success) {
+                            robotMessageBox.find('.content').append('<div class="error">Error: ' + response.message + '</div>');
+                            chatBox.scrollTop(chatBox[0].scrollHeight);
+                        }
+                    },
+                    error: function() {
+                        robotMessageBox.find('.content').append('<div class="error">Error: Unable to send message. Please try again later.</div>');
+                        chatBox.scrollTop(chatBox[0].scrollHeight);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

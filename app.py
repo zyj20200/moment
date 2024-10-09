@@ -1,10 +1,11 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Moment, Comment
 from forms import LoginForm, RegisterForm
 import requests
+import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_secret_key'
@@ -20,12 +21,17 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-API_URL = 'http://192.168.110.33:8888/gen'
+CHAT_API_URL = 'http://192.168.110.33:8888/chat'
 
 @app.route('/')
 def index():
     moments = Moment.query.order_by(Moment.timestamp.desc()).all()
     return render_template('index.html', moments=moments)
+
+@app.route('/chat')
+@login_required
+def chat():
+    return render_template('chat.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -36,7 +42,7 @@ def register():
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
             return redirect(url_for('register'))
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')  # 更改
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         new_user = User(username=username, password=hashed_password)
         db.session.add(new_user)
         db.session.commit()
@@ -71,7 +77,7 @@ def post_moment():
         db.session.commit()
 
         # 调用API获取评论内容
-        response = requests.post(API_URL, json={"message": content})
+        response = requests.post(CHAT_API_URL, json={"message": content})
         if response.status_code == 200:
             comments = response.json().get('comment', [])
             for comment_text in comments:
@@ -93,8 +99,37 @@ def comment_moment(moment_id):
         return jsonify(success=True, comment=new_comment.text, timestamp=new_comment.timestamp.strftime('%Y-%m-%d %H:%M:%S'))
     return jsonify(success=False)
 
+@app.route('/send_message', methods=['POST'])
+@login_required
+def send_message():
+    message = request.form.get('message')
+    if not message:
+        return jsonify(success=False, message="No message provided")
+
+    # Save the message to be retrieved by the SSE endpoint
+    app.config['current_message'] = message
+
+    return jsonify(success=True)
+
+@app.route('/chat_stream')
+@login_required
+def chat_stream():
+    def generate():
+        while True:
+            if 'current_message' in app.config:
+                print(f"Processing message: {app.config['current_message']}") # Debug log
+                response = requests.post(CHAT_API_URL, json={"message": app.config['current_message']}, stream=True)
+                for line in response.iter_lines():
+                    if line:
+                        print(f"Sending data: {line.decode('utf-8')}") # Debug log
+                        yield f"{line.decode('utf-8')}\n\n"
+                if 'current_message' in app.config:
+                    del app.config['current_message']
+            time.sleep(1)
+
+    return Response(generate(), mimetype='text/event-stream')
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    # app.run(debug=True)
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True)
